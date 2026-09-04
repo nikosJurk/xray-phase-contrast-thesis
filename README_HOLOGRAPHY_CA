@@ -96,3 +96,8 @@ Reconstructed images and diagnostic plots are saved under `holo_images/`:
 - Paths in the script (e.g. `outdir`) are specific to the original
   acquisition machine and should be updated before running elsewhere.
 - The reconstruction step (`Rec.BH`) requires a CUDA-capable GPU via CuPy.
+
+## Credits
+
+All credit for the reconstruction pipeline and analysis code goes to
+**Viktor Nikitin**.
