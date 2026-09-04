@@ -15,10 +15,10 @@ pipeline (real data + matching simulation), evaluated the same way.
 
 | File | What it does |
 |---|---|
-| `X_ray_phase_contrast_retrieval.py` | Processes the real, measured X-ray detector images from DanMAX and reconstructs the phase using several multi-distance techniques. See [README_EXPERIMENTAL.md](README_EXPERIMENTAL.md) for details. |
-| `X_ray_phase_contrast_simulation.py` | Builds a known synthetic sample, simulates the detector images, and runs the same reconstruction/analysis pipeline — used to validate the real-data results against a known ground truth. See [README_SIMULATION.md](README_SIMULATION.md) for details. |
-| `nano_holography_reconstruction.py` | Reconstructs coded-aperture (CA) nano-holography data of the same Siemens star target from real DanMAX scans. See [README_NANO_HOLOGRAPHY.md](README_NANO_HOLOGRAPHY.md) for details. |
-| `nano_holography_simulation.py` | Forward-simulates and reconstructs coded-aperture nano-holography data from a known synthetic sample, using the same geometry as the real CA experiment. See [README_NANO_HOLOGRAPHY.md](README_NANO_HOLOGRAPHY.md) for details. |
+| `Multi_distance_phase_retrieval_Experimental_Data.py` | Processes the real, measured X-ray detector images from DanMAX and reconstructs the phase using several multi-distance techniques. See [README_EXPERIMENTAL.md](README_EXPERIMENTAL.md) for details. |
+| `Multi_distance_phase_retrieval_Simulated_Data.py` | Builds a known synthetic sample, simulates the detector images, and runs the same reconstruction/analysis pipeline — used to validate the real-data results against a known ground truth. See [README_SIMULATION.md](README_SIMULATION.md) for details. |
+| `Nano_Holography_with_CA_Experimental_Data.py` | Reconstructs coded-aperture (CA) nano-holography data of the same Siemens star target from real DanMAX scans. See [README_NANO_HOLOGRAPHY.md](README_NANO_HOLOGRAPHY.md) for details. |
+| `Nano_Holography_with_CA_Simulated_Data.py` | Forward-simulates and reconstructs coded-aperture nano-holography data from a known synthetic sample, using the same geometry as the real CA experiment. See [README_NANO_HOLOGRAPHY.md](README_NANO_HOLOGRAPHY.md) for details. |
 | `PBI_phase_retrieval_functions.py`, `usefull_functions.py`, `utils.py`, `utils_sim.py`, `rec.py`, `rec_sim.py`, `cuda_kernels.py`, `cuda_kernels_sim.py`, `chunking.py`, `chunking_sim.py` | Shared helper modules used by the scripts above. `*_sim` variants are used by the simulation scripts; the rest are shared or used by the real-data scripts. |
 
 ## Getting started
