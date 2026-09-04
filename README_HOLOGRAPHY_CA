@@ -3,6 +3,17 @@
 Reconstruction pipeline for X-ray coded-aperture (CA) holography data of a
 Siemens star resolution target, acquired at **DanMAX** (April 2026).
 
+This repo contains two scripts:
+
+- `Nano_Holography_with_CA_Experimantal_Data.py` — reconstruction pipeline for the
+  **real experimental data** (10x10 scan of the physical CA/sample).
+- `nano_holography_simulation.py` — a **matching forward-simulation +
+  reconstruction** script that builds a physically-modeled sample, coded
+  aperture, probe, and scan grid, simulates coded holograms, reconstructs
+  them, and runs the same resolution (MTF) and contrast-to-noise (CNR)
+  analysis. Useful for testing the pipeline and geometry choices against a
+  known ground truth before/alongside processing real data.
+
 ## Experiment overview
 
 - **Sample:** XRESO-50HC Siemens star resolution target
@@ -15,15 +26,15 @@ Siemens star resolution target, acquired at **DanMAX** (April 2026).
 - **Geometry:**
   - `z1` (focus → sample): ~0.125–0.127 m
   - `z2` (sample → detector): 1.430 m
-  - Detector pixel size: 550 nm
+  - Detector pixel size: 0.55 µm
 
 ## Pipeline
 
-The main script (Nano_Holography_with_CA_Experimantal_Data.py`) runs the following
+The main script (`nano_holography_reconstruction.py`) runs the following
 steps, in order:
 
 1. **Load raw data** — reads the sample scan, flat field, and dark field
-   frames from HDF5.
+   frames from HDF5 (`entry/instrument/orca/data`).
 2. **Flat/dark field correction** — normalizes each frame using the mean
    flat and dark fields.
 3. **Crop** — restricts each frame to the region of interest containing the
@@ -34,7 +45,7 @@ steps, in order:
    Frame order is then rearranged into a serpentine (boustrophedon) scan
    path and shifts are refined on Gaussian-smoothed residuals.
 5. **Reconstruction** — runs an iterative object/probe/position-correction
-   reconstruction, producing the complex
+   reconstruction (`Rec.BH`) on GPU (via CuPy), producing the complex
    transmission function `psi` (object) and `q` (probe).
 6. **Resolution analysis** — computes ring/radial profiles and an
    MTF-style resolution summary around the Siemens star center
@@ -46,6 +57,41 @@ steps, in order:
    (radial) MTF profile of the Siemens star, reporting the spatial
    frequency (and corresponding resolution) at which the MTF drops to
    10% and 50%.
+
+## Simulation script (`Nano_Holography_with_CA_Simulation.py`)
+
+A self-contained forward-model + reconstruction pipeline, structured in
+numbered sections:
+
+1. **Imports** — imports the GPU engine (`rec_sim`, `utils_sim`) defensively,
+   so geometry/sample sections can still be inspected off-cluster.
+2. **Geometry & args** — sets energy, distances (`z1`, `z1c`, `z2`), and
+   derives the effective propagation distances, magnification, and
+   object-plane voxel size. `z1c` selects whether the coded aperture (CA)
+   sits upstream of the focus or between focus and sample.
+3. **Sample** — builds a physically-modeled Siemens star (NTT-AT XRESO-50HC
+   datasheet): a Ta absorber pattern on a SiC membrane, with optical
+   constants from a NIST pipeline or `xraylib`.
+4. **Coded aperture** — builds a random binary CA pattern (material,
+   thickness, bit size, rotation, edge smoothing configurable).
+5. **Probe** — builds either a flat (`q=1`) or synthetic focused illumination
+   profile.
+6. **Scan positions** — builds a regular (optionally jittered) grid of CA
+   shift positions.
+7. **Forward simulation** — simulates coded holograms and a flat-field
+   reference using the engine's forward model.
+8. **Reconstruction** — runs the same Barzilai-Hestenes optimizer as the
+   real-data pipeline to recover the sample, probe, and positions.
+9. **Resolution / ring-profile analysis** — ring profiles and a resolution
+   summary on the reconstructed sample.
+10. **MTF analysis** — radial MTF curves (amplitude & phase) with
+    exclusion zones for known target defects.
+11. **CNR analysis** — contrast-to-noise ratio between Ta-wedge (signal) and
+    SiC-gap (background) regions, averaged over many angular ROI pairs.
+
+The reconstruction engine (`rec_sim.py`, `utils_sim.py`,
+`cuda_kernels_sim.py`, `chunking_sim.py`) is used unchanged; this script only
+builds physically-realistic inputs for it.
 
 ## Requirements
 
@@ -59,18 +105,24 @@ steps, in order:
 
 Plus project-local modules (not included in this repo, expected on the
 `PYTHONPATH`):
-- `utils` — provides `mshow`, `mshow_polar`, `mshow_complex`,
-  `remove_outliers`
-- `rec` — provides the `Rec` reconstruction class (`Rec.BH`)
+- `utils` / `utils_sim` — provide `mshow`, `mshow_polar`, `mshow_complex`,
+  `remove_outliers`, `mplot_positions`, etc.
+- `rec` / `rec_sim` (+ `cuda_kernels_sim`, `chunking_sim`) — provide the
+  `Rec` reconstruction class (`Rec.BH`, `Rec.fwd`, `Rec.DcT`, `Rec.DT`)
 - `usefull_functions` — provides `check_data`, `view_stack_jupyter`,
   `check_gpu_memory`, `plot_abs_phase_ring_profiles`, `circular_profile`,
-  `resolution_summary`
+  `circular_profile_angle`, `modulation_lstsq`, `resolution_summary`
+- `optical_constants` (optional, NIST-based) and/or `xraylib` — provide
+  refractive-index (delta/beta) values for the sample and CA materials
 
 ## Usage
 
-The script is written as a Jupyter/IPython notebook cell sequence
-(`%matplotlib inline` at the top) and is meant to be run interactively,
-cell by cell, in Jupyter.
+Both scripts are written as Jupyter/IPython notebook cell sequences
+(`%matplotlib inline` / `%matplotlib widget` at the top) and are meant to be
+run interactively, cell by cell, in Jupyter. Both require a CUDA-capable GPU
+(via CuPy) for the actual reconstruction steps.
+
+### Real-data pipeline (`nano_holography_reconstruction.py`)
 
 1. Set `outdir` to the folder containing your raw `scan-XXXX_orca.h5`
    files (sample scan, flat field, dark field).
@@ -83,6 +135,20 @@ cell by cell, in Jupyter.
 5. Use `analyze_star(...)` separately to compute MTF curves from any
    saved TIFF reconstruction.
 
+### Simulation pipeline (`nano_holography_simulation.py`)
+
+1. Adjust the geometry (Section 2: `z1`, `z1c`, `focusToDetectorDistance`,
+   `energy`), sample parameters (Section 3: target size, absorber/membrane
+   materials and thickness), coded-aperture parameters (Section 4:
+   material, thickness, bit size), probe mode (Section 5: `USE_PROBE`), and
+   scan grid (Section 6: `CA_NPOS`, `CA_GRID_SPACING`, `CA_JITTER`).
+2. Run Sections 1-6 to build the sample, coded aperture, probe, and scan
+   positions (CPU-only, so these can be checked without a GPU).
+3. Run Sections 7-8 on the HPC/GPU to simulate coded holograms and
+   reconstruct the sample.
+4. Run Section 9 for ring-profile/resolution analysis, and the MTF/CNR
+   sections for quantitative resolution and contrast metrics.
+
 ## Output
 
 Reconstructed images and diagnostic plots are saved under `holo_images/`:
@@ -93,9 +159,11 @@ Reconstructed images and diagnostic plots are saved under `holo_images/`:
 
 ## Notes
 
-- Paths in the script (e.g. `outdir`) are specific to the original
-  acquisition machine and should be updated before running elsewhere.
-- The reconstruction step (`Rec.BH`) requires a CUDA-capable GPU via CuPy.
+- Paths in the scripts (e.g. `outdir`, `OC_SOURCE_DIR`) are specific to the
+  original acquisition/analysis machine and should be updated before
+  running elsewhere.
+- The reconstruction steps (`Rec.BH`, `Rec.fwd`) require a CUDA-capable
+  GPU via CuPy.
 
 ## Credits
 
