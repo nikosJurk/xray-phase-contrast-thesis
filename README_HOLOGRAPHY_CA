@@ -7,7 +7,7 @@ This repo contains two scripts:
 
 - `Nano_Holography_with_CA_Experimantal_Data.py` — reconstruction pipeline for the
   **real experimental data** (10x10 scan of the physical CA/sample).
-- `nano_holography_simulation.py` — a **matching forward-simulation +
+- `Nano_Holography_with_CA_Simulated_Data.py` — a **matching forward-simulation +
   reconstruction** script that builds a physically-modeled sample, coded
   aperture, probe, and scan grid, simulates coded holograms, reconstructs
   them, and runs the same resolution (MTF) and contrast-to-noise (CNR)
@@ -30,7 +30,7 @@ This repo contains two scripts:
 
 ## Pipeline
 
-The main script (`nano_holography_reconstruction.py`) runs the following
+The main script (`Nano_Holography_with_CA_Experimantal_Data.py`) runs the following
 steps, in order:
 
 1. **Load raw data** — reads the sample scan, flat field, and dark field
@@ -58,7 +58,7 @@ steps, in order:
    frequency (and corresponding resolution) at which the MTF drops to
    10% and 50%.
 
-## Simulation script (`Nano_Holography_with_CA_Simulation.py`)
+## Simulation script (`Nano_Holography_with_CA_Simulated_Data.py`)
 
 A self-contained forward-model + reconstruction pipeline, structured in
 numbered sections:
