@@ -1,0 +1,139 @@
+# X-ray Phase-Contrast Retrieval (Multi-Distance PBI)
+
+Two companion scripts for propagation-based phase-contrast imaging (PBI) of
+a Siemens star resolution target, using multiple sample-to-detector
+distances:
+
+- **`X_ray_phase_contrast_retrieval.py`** — processes **real measured**
+  X-ray detector images (DanMAX), reconstructs phase-contrast images, and
+  measures their quality.
+- **`X_ray_phase_contrast_simulation.py`** — the simulation counterpart:
+  builds a known synthetic sample, simulates what the detector should see
+  under the same beamline geometry, reconstructs it with the same
+  algorithms, and — because the ground truth is known — checks how
+  accurate each reconstruction method actually is. It also compares its
+  simulated reconstructions against a real reconstruction to validate the
+  simulation itself.
+
+Both scripts are written top-to-bottom as numbered, commented sections,
+each building on the previous one.
+
+## `Multi_distance_phase_retrieval_experimental_data.py` 
+
+1. **Loads the raw data.** Five detector images taken at different
+   sample-to-detector distances, plus a dark frame (no beam) and a flat
+   frame (beam, no sample) used for calibration.
+2. **Cleans up the images.** Removes the detector's background signal and
+   normalizes for uneven beam illumination (standard flat-field
+   correction). Also checks that the beam and detector were stable during
+   the measurement.
+3. **Lines everything up.** Each of the five images is taken at a
+   different distance, so each comes out at a slightly different
+   magnification. The script rescales them all to the same effective
+   magnification, then aligns them pixel-for-pixel using cross-correlation,
+   fixing both large and sub-pixel misalignments.
+4. **Reconstructs the phase.** This is the core of the script. It applies
+   several reconstruction algorithms to the aligned data:
+   - a **CTF** (Contrast Transfer Function) method, which is fast and
+     doesn't need to know what the sample is made of,
+   - and a few methods that *do* assume a known material (Paganin,
+     homoCTF, sglDstCTF), which can give better results if that assumption
+     holds.
+
+   Each method is tried using different combinations of the five distances
+   (just one distance, two combined, all five combined, etc.), to see how
+   much using more distances actually helps.
+5. **Measures how good each reconstruction is.** Sharper images resolve
+   finer detail. The script quantifies this with two independent methods
+   (MTF and a Fourier-domain resolution estimate), plus a
+   contrast-to-noise measurement, and puts everything into result tables
+   and comparison plots so the different techniques can be judged side by
+   side.
+
+## `Multi_distance_phase_retrieval_simulated_data.py`
+
+1. **Builds a virtual sample.** A Siemens star test pattern (same
+   spoked-wheel design as the real target), made of a thin tantalum
+   absorber pattern on a silicon-carbide membrane. The optical properties
+   (how much the material absorbs and phase-shifts X-rays) are looked up
+   from physical tables, not guessed.
+2. **Simulates what the detector would see.** Using the exact same
+   beamline geometry as the real experiment (same distances, same
+   magnifications), it propagates the X-ray wave from the sample to the
+   detector using wave optics (Fresnel diffraction) — not a shortcut
+   approximation. It also adds the things that blur or add noise to a real
+   measurement: the finite size of the X-ray source, the detector's own
+   blur, and photon-counting noise. This produces five synthetic detector
+   images, matching the five real distances in the actual experiment.
+3. **Reconstructs the phase**, using the same family of algorithms as the
+   real-data script (CTF, homoCTF, Paganin, sglDstCTF), tried with
+   different combinations of the five distances.
+4. **Checks the answer.** Since the true phase of the virtual sample is
+   known exactly, the script can directly compare each reconstruction
+   against the ground truth — not just estimate resolution the way the
+   real-data script has to.
+5. **Measures resolution and contrast**, the same way as the real-data
+   script (MTF, Fourier-domain resolution, contrast-to-noise), so the two
+   scripts' numbers are directly comparable.
+6. **Compares against a real measurement.** The last part of the script
+   loads an actual reconstructed image (produced earlier by the real-data
+   pipeline), lines it up pixel-for-pixel with the matching simulation,
+   and reports how closely they agree — the key sanity check for whether
+   the whole simulation is realistic, not just internally consistent.
+
+## Before running
+
+Near the top of each script there's a `CONFIG` section — set these to
+point at your own data/files.
+
+- If you don't have the NIST optical-constants pipeline, the simulation
+  script falls back to `xraylib` automatically — just make sure it's
+  installed.
+- GPU acceleration (`cupy`, `pyfftw`) is optional for the retrieval
+  script — it falls back to CPU automatically if they're not installed.
+
+### Requirements
+
+- `numpy`, `scipy`, `matplotlib`, `pandas`, `h5py`
+- Optional (retrieval script): `cupy`, `pyfftw` (GPU acceleration)
+- Optional (simulation script): NIST optical-constants pipeline, or
+  `xraylib` as a fallback
+
+### Project-local helper modules
+
+Not included in this repo, expected on the `PYTHONPATH`:
+
+- `utils`, `rec` — shared utilities and the reconstruction engine
+- `usefull_functions` — resolution (MTF), ring-profile, and CNR analysis
+  helpers, shared by both scripts
+- `PBI_phase_retrieval_functions` — the multi-distance phase-retrieval
+  algorithms (CTF, homoCTF, Paganin, sglDstCTF), shared by both scripts
+
+## Things worth knowing
+
+- Some numbers in `X_ray_phase_contrast_retrieval.py` (like the pixel
+  position of the test pattern's center) were found by hand for this
+  specific dataset. If you run it on different measurements, you'll need
+  to re-find those — they're marked with `NOTE` comments where they
+  appear.
+- The comments in `X_ray_phase_contrast_retrieval.py` explain *why* each
+  step is done the way it is, not just what it does — including a couple
+  of bugs found and fixed while cleaning up the script (noted inline
+  where relevant).
+- `X_ray_phase_contrast_simulation.py` assembles what used to be several
+  separate notebook cells, some of which had been duplicated with
+  slightly different settings along the way. During cleanup, the
+  duplicates were merged and a few small inconsistencies between them
+  (like the same setting being redefined with different values in
+  different places) were resolved and clearly labeled with `NOTE`
+  comments — worth checking if a number looks different from what you
+  remember getting before.
+- The last section of `X_ray_phase_contrast_simulation.py` (comparing
+  against a real measurement) needs a `.npy` file already produced by
+  `X_ray_phase_contrast_retrieval.py` — run that script first if you
+  don't have one yet.
+- Running `X_ray_phase_contrast_simulation.py` end-to-end (all five
+  distances, every reconstruction method, the full resolution/CNR
+  analysis, and the real-vs-simulated comparison) takes a while — it's
+  meant to be run in one sitting, not re-run from scratch for small
+  tweaks.
