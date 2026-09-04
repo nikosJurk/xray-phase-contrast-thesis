@@ -15,15 +15,15 @@ Siemens star resolution target, acquired at **DanMAX** (April 2026).
 - **Geometry:**
   - `z1` (focus → sample): ~0.125–0.127 m
   - `z2` (sample → detector): 1.430 m
-  - Detector pixel size: 0.55 µm
+  - Detector pixel size: 550 nm
 
 ## Pipeline
 
-The main script (`nano_holography_reconstruction.py`) runs the following
+The main script (Nano_Holography_with_CA_Experimantal_Data.py`) runs the following
 steps, in order:
 
 1. **Load raw data** — reads the sample scan, flat field, and dark field
-   frames from HDF5 (`entry/instrument/orca/data`).
+   frames from HDF5.
 2. **Flat/dark field correction** — normalizes each frame using the mean
    flat and dark fields.
 3. **Crop** — restricts each frame to the region of interest containing the
@@ -34,7 +34,7 @@ steps, in order:
    Frame order is then rearranged into a serpentine (boustrophedon) scan
    path and shifts are refined on Gaussian-smoothed residuals.
 5. **Reconstruction** — runs an iterative object/probe/position-correction
-   reconstruction (`Rec.BH`) on GPU (via CuPy), producing the complex
+   reconstruction, producing the complex
    transmission function `psi` (object) and `q` (probe).
 6. **Resolution analysis** — computes ring/radial profiles and an
    MTF-style resolution summary around the Siemens star center
