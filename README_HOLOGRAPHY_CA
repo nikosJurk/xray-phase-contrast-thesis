@@ -1,0 +1,98 @@
+# Nano-Holography Reconstruction (X-ray Coded-Aperture Holography)
+
+Reconstruction pipeline for X-ray coded-aperture (CA) holography data of a
+Siemens star resolution target, acquired at **DanMAX** (April 2026).
+
+## Experiment overview
+
+- **Sample:** XRESO-50HC Siemens star resolution target
+  ([datasheet](https://keytech.ntt-at.com/en/xray/prd_0024.html))
+- **Technique:** Coded-aperture (CA) holography, CA period 550 nm
+- **Detector:** 10x ORCA, effective pixel size 45 nm
+- **Optics:** CRL = 12, Si(111) monochromator
+- **Beam energy:** 19.55 keV
+- **Scan:** 10x10 grid of CA positions, sample fixed, CA moving
+- **Geometry:**
+  - `z1` (focus → sample): ~0.125–0.127 m
+  - `z2` (sample → detector): 1.430 m
+  - Detector pixel size: 0.55 µm
+
+## Pipeline
+
+The main script (`nano_holography_reconstruction.py`) runs the following
+steps, in order:
+
+1. **Load raw data** — reads the sample scan, flat field, and dark field
+   frames from HDF5 (`entry/instrument/orca/data`).
+2. **Flat/dark field correction** — normalizes each frame using the mean
+   flat and dark fields.
+3. **Crop** — restricts each frame to the region of interest containing the
+   sample.
+4. **Shift estimation** — isolates the CA modulation by removing the static
+   sample (geometric-mean estimate + high-pass filtering), then estimates
+   relative shifts between scan positions via FFT-based phase correlation.
+   Frame order is then rearranged into a serpentine (boustrophedon) scan
+   path and shifts are refined on Gaussian-smoothed residuals.
+5. **Reconstruction** — runs an iterative object/probe/position-correction
+   reconstruction (`Rec.BH`) on GPU (via CuPy), producing the complex
+   transmission function `psi` (object) and `q` (probe).
+6. **Resolution analysis** — computes ring/radial profiles and an
+   MTF-style resolution summary around the Siemens star center
+   (`plot_abs_phase_ring_profiles`, `resolution_summary`).
+7. **Export** — saves reconstructed amplitude/phase as TIFF (float32) and
+   PNG, and batch-saves all diagnostic figures to `holo_images/`.
+8. **Standalone MTF analysis** (`analyze_star`) — a reusable function that
+   loads saved TIFF reconstructions and computes the circular
+   (radial) MTF profile of the Siemens star, reporting the spatial
+   frequency (and corresponding resolution) at which the MTF drops to
+   10% and 50%.
+
+## Requirements
+
+- Python 3.9+
+- [CuPy](https://cupy.dev/) (CUDA-enabled GPU required for reconstruction)
+- NumPy, SciPy, scikit-image
+- h5py
+- pandas
+- matplotlib
+- tifffile
+
+Plus project-local modules (not included in this repo, expected on the
+`PYTHONPATH`):
+- `utils` — provides `mshow`, `mshow_polar`, `mshow_complex`,
+  `remove_outliers`
+- `rec` — provides the `Rec` reconstruction class (`Rec.BH`)
+- `usefull_functions` — provides `check_data`, `view_stack_jupyter`,
+  `check_gpu_memory`, `plot_abs_phase_ring_profiles`, `circular_profile`,
+  `resolution_summary`
+
+## Usage
+
+The script is written as a Jupyter/IPython notebook cell sequence
+(`%matplotlib inline` at the top) and is meant to be run interactively,
+cell by cell, in Jupyter.
+
+1. Set `outdir` to the folder containing your raw `scan-XXXX_orca.h5`
+   files (sample scan, flat field, dark field).
+2. Adjust `npos` (sub-grid size to extract from the full 10x10 scan) and
+   the crop region (`x_min`, `x_max`, `y_min`, `y_max`) for your dataset.
+3. Adjust the geometry parameters (`z1`, `z2`, `energy`, `pixelsize`) to
+   match your experimental setup.
+4. Run all cells to perform flat/dark correction, shift estimation,
+   reconstruction, resolution analysis, and export.
+5. Use `analyze_star(...)` separately to compute MTF curves from any
+   saved TIFF reconstruction.
+
+## Output
+
+Reconstructed images and diagnostic plots are saved under `holo_images/`:
+
+- `Nano_recon_npos_<N>X<N>_abs.tiff` / `.png` — reconstructed amplitude
+- `Nano_recon_npos_<N>X<N>_phase.tiff` / `.png` — reconstructed phase
+- `phase_abs_*.png`, `resolution_summary_*.png` — diagnostic figures
+
+## Notes
+
+- Paths in the script (e.g. `outdir`) are specific to the original
+  acquisition machine and should be updated before running elsewhere.
+- The reconstruction step (`Rec.BH`) requires a CUDA-capable GPU via CuPy.
